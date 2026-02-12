@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Fighting Game</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        .game-container {
+            position: relative;
+            width: 600px;
+            height: 300px;
+            margin: 20px auto;
+            border: 2px solid black;
+            background-color: lightgray;
+            overflow: hidden;
+        }
+
+        .fighter {
+            width: 50px;
+            height: 80px;
+            position: absolute;
+            bottom: 0;
+            background-color: blue;
+        }
+
+        #player1 {
+            left: 50px;
+            background-color: rgb(5, 154, 165);
+        }
+
+        #player2 {
+            right: 50px;
+            background-color: rgb(129, 117, 8);
+        }
+
+        .punch {
+            width: 70px;
+            background-color: rgb(180, 6, 122);
+        }
+
+        #message {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fighting Game - Player 1 (A, D, Space) vs Player 2 (←, →, Enter)</h1>
+    <div class="game-container">
+        <div id="player1" class="fighter"></div>
+        <div id="player2" class="fighter"></div>
+    </div>
+    <div id="message"></div>
+
+    <script>
+        const player1 = document.getElementById("player1");
+        const player2 = document.getElementById("player2");
+        const message = document.getElementById("message");
+
+        let p1Health = 3;
+        let p2Health = 3;
+
+        document.addEventListener("keydown", (event) => {
+            switch(event.key) {
+                // Player 1 Controls (A, D, Space)
+                case "a":
+                    move(player1, -20);
+                    break;
+                case "d":
+                    move(player1, 20);
+                    break;
+                case " ":
+                    attack(player1, player2);
+                    break;
+
+                // Player 2 Controls (Left, Right, Enter)
+                case "ArrowLeft":
+                    move(player2, -20);
+                    break;
+                case "ArrowRight":
+                    move(player2, 20);
+                    break;
+                case "Enter":
+                    attack(player2, player1);
+                    break;
+            }
+        });
+
+        // Move function
+        function move(player, distance) {
+            let currentPos = parseInt(window.getComputedStyle(player).getPropertyValue("left")) || 0;
+            let newPos = currentPos + distance;
+            if (newPos >= 0 && newPos <= 550) { // Prevent going out of bounds
+                player.style.left = newPos + "px";
+            }
+        }
+
+        // Attack function
+        function attack(attacker, defender) {
+            attacker.classList.add("punch");
+            setTimeout(() => attacker.classList.remove("punch"), 300);
+
+            let attackerPos = parseInt(window.getComputedStyle(attacker).getPropertyValue("left")) || 0;
+            let defenderPos = parseInt(window.getComputedStyle(defender).getPropertyValue("left")) || 0;
+
+            if (Math.abs(attackerPos - defenderPos) < 60) {
+                if (defender === player1) {
+                    p1Health--;
+                } else {
+                    p2Health--;
+                }
+                checkGameOver();
+            }
+        }
+
+        // Check for game over
+        function checkGameOver() {
+            if (p1Health === 0) {
+                message.innerText = "Player 2 Wins!";
+            } else if (p2Health === 0) {
+                message.innerText = "Player 1 Wins!";
+            }
+        }
+    </script>
+</body>
+</html>
+
