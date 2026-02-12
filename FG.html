@@ -3,132 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Fighting Game</title>
+    <title>Street Coder: HTML Edition</title>
     <style>
         body {
             text-align: center;
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #222;
+            color: white;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .ui-container {
+            display: flex;
+            justify-content: space-around;
+            width: 600px;
+            margin: 20px auto 0;
+        }
+
+        .health-bar-bg {
+            width: 250px;
+            height: 20px;
+            background-color: #444;
+            border: 2px solid #fff;
+            position: relative;
+        }
+
+        .health-fill {
+            height: 100%;
+            width: 100%;
+            background-color: #e74c3c;
+            transition: width 0.2s ease-out;
         }
 
         .game-container {
             position: relative;
-            width: 600px;
-            height: 300px;
-            margin: 20px auto;
-            border: 2px solid black;
-            background-color: lightgray;
+            width: 800px;
+            height: 400px;
+            margin: 10px auto;
+            border-bottom: 5px solid #555;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
             overflow: hidden;
         }
 
         .fighter {
-            width: 50px;
-            height: 80px;
+            width: 60px;
+            height: 100px;
             position: absolute;
             bottom: 0;
-            background-color: blue;
+            transition: transform 0.1s;
         }
 
-        #player1 {
-            left: 50px;
-            background-color: rgb(5, 154, 165);
-        }
+        #player1 { left: 100px; background-color: #3498db; border-radius: 5px 5px 0 0; }
+        #player2 { left: 640px; background-color: #f1c40f; border-radius: 5px 5px 0 0; }
 
-        #player2 {
-            right: 50px;
-            background-color: rgb(129, 117, 8);
-        }
-
-        .punch {
-            width: 70px;
-            background-color: rgb(180, 6, 122);
+        /* Visual indicator for attacking */
+        .attacking {
+            filter: brightness(1.5);
+            width: 90px; /* Stretch to show hit range */
         }
 
         #message {
-            margin-top: 20px;
-            font-size: 20px;
+            font-size: 40px;
             font-weight: bold;
+            color: #f1c40f;
+            text-shadow: 2px 2px #000;
+            margin-top: 20px;
         }
+
+        .controls-hint { color: #888; font-size: 0.9em; }
     </style>
 </head>
 <body>
-    <h1>Fighting Game - Player 1 (A, D, Space) vs Player 2 (←, →, Enter)</h1>
-    <div class="game-container">
+
+    <div class="ui-container">
+        <div>
+            <div>Player 1</div>
+            <div class="health-bar-bg"><div id="p1-fill" class="health-fill"></div></div>
+        </div>
+        <div>
+            <div>Player 2</div>
+            <div class="health-bar-bg"><div id="p2-fill" class="health-fill"></div></div>
+        </div>
+    </div>
+
+    <div class="game-container" id="arena">
         <div id="player1" class="fighter"></div>
         <div id="player2" class="fighter"></div>
     </div>
-    <div id="message"></div>
+
+    <div id="message">FIGHT!</div>
+    <p class="controls-hint">P1: A, D (Move), W (Jump), Space (Attack) | P2: Arrow Keys (Move/Jump), Enter (Attack)</p>
 
     <script>
-        const player1 = document.getElementById("player1");
-        const player2 = document.getElementById("player2");
-        const message = document.getElementById("message");
+        const p1El = document.getElementById("player1");
+        const p2El = document.getElementById("player2");
+        const msg = document.getElementById("message");
 
-        let p1Health = 3;
-        let p2Health = 3;
+        // Game Constants
+        const GRAVITY = 0.8;
+        const MOVE_SPEED = 7;
+        const JUMP_FORCE = -15;
+        const GROUND_Y = 0;
 
-        document.addEventListener("keydown", (event) => {
-            switch(event.key) {
-                // Player 1 Controls (A, D, Space)
-                case "a":
-                    move(player1, -20);
-                    break;
-                case "d":
-                    move(player1, 20);
-                    break;
-                case " ":
-                    attack(player1, player2);
-                    break;
+        // Player States
+        let players = {
+            p1: { x: 100, y: 0, vy: 0, hp: 100, isJumping: false, isAttacking: false, el: p1El, fill: document.getElementById("p1-fill") },
+            p2: { x: 640, y: 0, vy: 0, hp: 100, isJumping: false, isAttacking: false, el: p2El, fill: document.getElementById("p2-fill") }
+        };
 
-                // Player 2 Controls (Left, Right, Enter)
-                case "ArrowLeft":
-                    move(player2, -20);
-                    break;
-                case "ArrowRight":
-                    move(player2, 20);
-                    break;
-                case "Enter":
-                    attack(player2, player1);
-                    break;
+        let keys = {};
+        let gameOver = false;
+
+        document.addEventListener("keydown", (e) => keys[e.code] = true);
+        document.addEventListener("keyup", (e) => keys[e.code] = false);
+
+        function update() {
+            if (gameOver) return;
+
+            // --- Player 1 Logic ---
+            if (keys['KeyA']) players.p1.x -= MOVE_SPEED;
+            if (keys['KeyD']) players.p1.x += MOVE_SPEED;
+            if (keys['KeyW'] && !players.p1.isJumping) {
+                players.p1.vy = JUMP_FORCE;
+                players.p1.isJumping = true;
             }
-        });
+            if (keys['Space'] && !players.p1.isAttacking) attack('p1', 'p2');
 
-        // Move function
-        function move(player, distance) {
-            let currentPos = parseInt(window.getComputedStyle(player).getPropertyValue("left")) || 0;
-            let newPos = currentPos + distance;
-            if (newPos >= 0 && newPos <= 550) { // Prevent going out of bounds
-                player.style.left = newPos + "px";
+            // --- Player 2 Logic ---
+            if (keys['ArrowLeft']) players.p2.x -= MOVE_SPEED;
+            if (keys['ArrowRight']) players.p2.x += MOVE_SPEED;
+            if (keys['ArrowUp'] && !players.p2.isJumping) {
+                players.p2.vy = JUMP_FORCE;
+                players.p2.isJumping = true;
             }
-        }
+            if (keys['Enter'] && !players.p2.isAttacking) attack('p2', 'p1');
 
-        // Attack function
-        function attack(attacker, defender) {
-            attacker.classList.add("punch");
-            setTimeout(() => attacker.classList.remove("punch"), 300);
+            // Apply Physics & Bounds
+            [players.p1, players.p2].forEach(p => {
+                // Gravity
+                p.vy += GRAVITY;
+                p.y -= p.vy;
 
-            let attackerPos = parseInt(window.getComputedStyle(attacker).getPropertyValue("left")) || 0;
-            let defenderPos = parseInt(window.getComputedStyle(defender).getPropertyValue("left")) || 0;
-
-            if (Math.abs(attackerPos - defenderPos) < 60) {
-                if (defender === player1) {
-                    p1Health--;
-                } else {
-                    p2Health--;
+                if (p.y <= GROUND_Y) {
+                    p.y = GROUND_Y;
+                    p.vy = 0;
+                    p.isJumping = false;
                 }
-                checkGameOver();
-            }
+
+                // Bounds
+                p.x = Math.max(0, Math.min(p.x, 740));
+
+                // Update Visuals
+                p.el.style.left = p.x + "px";
+                p.el.style.bottom = p.y + "px";
+            });
+
+            requestAnimationFrame(update);
         }
 
-        // Check for game over
-        function checkGameOver() {
-            if (p1Health === 0) {
-                message.innerText = "Player 2 Wins!";
-            } else if (p2Health === 0) {
-                message.innerText = "Player 1 Wins!";
+        function attack(attackerId, defenderId) {
+            let a = players[attackerId];
+            let d = players[defenderId];
+
+            a.isAttacking = true;
+            a.el.classList.add("attacking");
+
+            // Hit Detection (check if close enough)
+            let distance = Math.abs(a.x - d.x);
+            let heightDiff = Math.abs(a.y - d.y);
+
+            if (distance < 90 && heightDiff < 80) {
+                d.hp -= 10;
+                d.fill.style.width = d.hp + "%";
+                d.el.style.backgroundColor = "white"; // "Hit" flash
+                setTimeout(() => d.el.style.backgroundColor = "", 100);
+                
+                checkWin();
             }
+
+            setTimeout(() => {
+                a.isAttacking = false;
+                a.el.classList.remove("attacking");
+            }, 200);
         }
+
+        function checkWin() {
+            if (players.p1.hp <= 0) endGame("PLAYER 2 WINS!");
+            if (players.p2.hp <= 0) endGame("PLAYER 1 WINS!");
+        }
+
+        function endGame(text) {
+            gameOver = true;
+            msg.innerText = text;
+        }
+
+        // Start Loop
+        update();
     </script>
 </body>
 </html>
-
